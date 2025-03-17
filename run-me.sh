@@ -33,15 +33,15 @@ then
     exit 1
 fi
 
-if [ ! -e "data/corpus.en" ]
+if [ ! -e "data/corpus.de" ]
 then
-    ./scripts/download-files.sh
+    ./scripts/download-files-spanish.sh
 fi
 
 mkdir -p model
 
 # preprocess data
-if [ ! -e "data/corpus.bpe.en" ]
+if [ ! -e "data/corpus.bpe.de" ]
 then
     ./scripts/preprocess-data.sh
 fi
@@ -75,7 +75,7 @@ cat data/corpus-dev.bpe.nl \
       --mini-batch 64 --maxi-batch 10 --maxi-batch-sort src \
     | sed 's/\@\@ //g' \
     | ../tools/moses-scripts/scripts/recaser/detruecase.perl \
-    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l de \
+    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l en \
     > data/corpus-dev.nl.output
 
 # translate test set
@@ -84,7 +84,7 @@ cat data/corpus-test.bpe.nl \
       --mini-batch 64 --maxi-batch 10 --maxi-batch-sort src \
     | sed 's/\@\@ //g' \
     | ../tools/moses-scripts/scripts/recaser/detruecase.perl \
-    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l de \
+    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l en \
     > data/corpus-test.nl.output
 
 # calculate bleu scores on dev and test set
