@@ -102,7 +102,7 @@ $MARIAN/build/marian \
     --train-sets data/corpus.$SRC data/corpus.$TGT \
     --vocabs model/vocab.$SRC$TGT.spm model/vocab.$SRC$TGT.spm \
     --dim-vocabs 32000 32000 \
-    --mini-batch-fit -w 5000 \
+    --mini-batch-fit -w 2000 \
     --layer-normalization --tied-embeddings-all \
     --dropout-rnn 0.2 --dropout-src 0.1 --dropout-trg 0.1 \
     --early-stopping 5 --max-length 100 \
@@ -114,16 +114,23 @@ $MARIAN/build/marian \
     --seed 1111 --exponential-smoothing \
     --normalize=0.6 --beam-size=6 --quiet-translation
 
-
-# Translate dev set
+# translate dev set
 cat data/transfile.$SRC \
-    | $MARIAN/build/marian-decoder -c model/model.npz.best-bleu-detok.npz.decoder.yml -d $GPUS -b 6 -n0.6 \
-      --mini-batch $CURRENT_BATCH_SIZE --maxi-batch 100 --maxi-batch-sort src > data/transfile.$SRC.output
+    | $MARIAN_DECODER -c model/model.npz.best-translation.npz.decoder.yml -d $GPUS -b 12 -n1 \
+      --mini-batch 64 --maxi-batch 10 --maxi-batch-sort src \
+    | sed 's/\@\@ //g' \
+    | ../tools/moses-scripts/scripts/recaser/detruecase.perl \
+    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l en \
+    > data/transfile.$SRC.output
 
-# Translate test set
+# translate test set
 cat data/newstest2016.$SRC \
-    | $MARIAN/build/marian-decoder -c model/model.npz.best-bleu-detok.npz.decoder.yml -d $GPUS -b 6 -n0.6 \
-      --mini-batch $CURRENT_BATCH_SIZE --maxi-batch 100 --maxi-batch-sort src > data/newstest2016.$SRC.output
+    | $MARIAN_DECODER -c model/model.npz.best-translation.npz.decoder.yml -d $GPUS -b 12 -n1 \
+      --mini-batch 64 --maxi-batch 10 --maxi-batch-sort src \
+    | sed 's/\@\@ //g' \
+    | ../tools/moses-scripts/scripts/recaser/detruecase.perl \
+    | ../tools/moses-scripts/scripts/tokenizer/detokenizer.perl -l en \
+    > data/newstest2016.$SRC.output
 
 
 # Calculate BLEU scores on the dev set and test set
