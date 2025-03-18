@@ -94,44 +94,26 @@ INITIAL_BATCH_SIZE=32
 CURRENT_BATCH_SIZE=$INITIAL_BATCH_SIZE
 MAX_RETRIES=5  # Max number of retries on memory issue
 
-# Train the model with error handling and dynamic batch size adjustment
-for ((i=1; i<=$MAX_RETRIES; i++)); do
-    echo "Training with batch size: $CURRENT_BATCH_SIZE"
-    
-    # Start training
-    $MARIAN/build/marian \
-        --devices $GPUS \
-        --type s2s \
-        --model model/model.npz \
-        --train-sets data/corpus.$SRC data/corpus.$TGT \
-        --vocabs model/vocab.$SRC$TGT.spm model/vocab.$SRC$TGT.spm \
-        --dim-vocabs 32000 32000 \
-        --mini-batch-fit -w 5000 \
-        --layer-normalization --tied-embeddings-all \
-        --dropout-rnn 0.2 --dropout-src 0.1 --dropout-trg 0.1 \
-        --early-stopping 5 --max-length 100 \
-        --valid-freq 10000 --save-freq 10000 --disp-freq 1000 \
-        --cost-type ce-mean-words --valid-metrics ce-mean-words bleu-detok \
-        --valid-sets data/transfile.$SRC data/transfile.$TGT \
-        --log model/train.log --valid-log model/valid.log --tempdir model \
-        --overwrite --keep-best \
-        --seed 1111 --exponential-smoothing \
-        --normalize=0.6 --beam-size=6 --quiet-translation
+# Train the model
+$MARIAN/build/marian \
+    --devices $GPUS \
+    --type s2s \
+    --model model/model.npz \
+    --train-sets data/corpus.$SRC data/corpus.$TGT \
+    --vocabs model/vocab.$SRC$TGT.spm model/vocab.$SRC$TGT.spm \
+    --dim-vocabs 32000 32000 \
+    --mini-batch-fit -w 5000 \
+    --layer-normalization --tied-embeddings-all \
+    --dropout-rnn 0.2 --dropout-src 0.1 --dropout-trg 0.1 \
+    --early-stopping 5 --max-length 100 \
+    --valid-freq 10000 --save-freq 10000 --disp-freq 1000 \
+    --cost-type ce-mean-words --valid-metrics ce-mean-words bleu-detok \
+    --valid-sets data/transfile.$SRC data/transfile.$TGT \
+    --log model/train.log --valid-log model/valid.log --tempdir model \
+    --overwrite --keep-best \
+    --seed 1111 --exponential-smoothing \
+    --normalize=0.6 --beam-size=6 --quiet-translation
 
-    # Check if training ran out of memory
-    if [ $? -eq 0 ]; then
-        echo "Training completed successfully!"
-        break
-    else
-        echo "Out of memory, retrying with reduced batch size..."
-        # Reduce the batch size for the next attempt
-        CURRENT_BATCH_SIZE=$((CURRENT_BATCH_SIZE / 2))
-        if [ $CURRENT_BATCH_SIZE -lt 16 ]; then
-            echo "Memory issues persist, and minimum batch size reached. Exiting."
-            exit 1
-        fi
-    fi
-done
 
 # Translate dev set
 cat data/transfile.$SRC \
