@@ -143,9 +143,13 @@ cat data/newstest2016.$SRC \
     | $MARIAN/build/marian-decoder -c model/model.npz.best-bleu-detok.npz.decoder.yml -d $GPUS -b 6 -n0.6 \
       --mini-batch $CURRENT_BATCH_SIZE --maxi-batch 100 --maxi-batch-sort src > data/newstest2016.$SRC.output
 
-# Calculate BLEU scores
-sacreBLEU/sacrebleu.py -t wmt16/dev -l $SRC-$TGT < data/transfile.$SRC.output
-sacreBLEU/sacrebleu.py -t wmt16 -l $SRC-$TGT < data/newstest2016.$SRC.output
+
+# Calculate BLEU scores on the dev set and test set
+echo "Calculating BLEU score for dev set..."
+../tools/moses-scripts/scripts/generic/multi-bleu-detok.perl data/transfile.$SRC < data/transfile.$SRC.output
+
+echo "Calculating BLEU score for test set..."
+../tools/moses-scripts/scripts/generic/multi-bleu-detok.perl data/newstest2016.$SRC < data/newstest2016.$SRC.output
 
 # Clean up (optional)
 # rm -rf data/*.tmp sacreBLEU
