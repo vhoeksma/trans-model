@@ -36,31 +36,34 @@ DATA_URLS=(
 mkdir -p data
 cd data
 
-# Download training data
+# Download training data (only if not already downloaded)
 for ENTRY in "${DATA_URLS[@]}"; do
     URL=$(echo $ENTRY | awk '{print $1}')
     FILE_NAME=$(echo $ENTRY | awk '{print $2}')
     
+    # Check if file is already downloaded, if not, download
     if [ ! -e "$FILE_NAME" ]; then
         echo "Downloading $FILE_NAME..."
         wget -nc "$URL" -O "$FILE_NAME"
     else
         echo "$FILE_NAME already exists, skipping download."
     fi
-done
-
-# Extract downloaded data
-for FILE in *.zip; do
-    echo "Extracting $FILE..."
-    unzip -o "$FILE"
+    
+    # Check if the extracted file(s) exist, if not, extract
+    if [ ! -e "${FILE_NAME%.zip}" ]; then
+        echo "Extracting $FILE_NAME..."
+        unzip -o "$FILE_NAME"
+    else
+        echo "Extracted files for $FILE_NAME already exist, skipping extraction."
+    fi
 done
 
 # Concatenate corpus files
 cat *.$SRC > corpus.$SRC
 cat *.$TGT > corpus.$TGT
 
-# Clean up extracted individual files
-rm -f *.zip
+# Clean up the extracted .zip files (keeping them as you requested)
+# rm -f *.zip  # Don't delete the zip files, as you want to keep them
 
 # Change back to main directory
 cd ..
@@ -72,8 +75,8 @@ git clone https://github.com/marian-nmt/sacreBLEU.git sacreBLEU
 echo "Manually setting up validation and test sets..."
 
 # Example: Use the first 1000 lines of the corpus as the validation set
-head -n 1000 data/corpus.$SRC > data/newsdev2016.$SRC
-head -n 1000 data/corpus.$TGT > data/newsdev2016.$TGT
+head -n 1000 data/corpus.$SRC > data/transfile.$SRC
+head -n 1000 data/corpus.$TGT > data/transfile.$TGT
 
 # Example: Use the next 1000 lines as the test set
 tail -n +1001 data/corpus.$SRC | head -n 1000 > data/newstest2016.$SRC
@@ -90,28 +93,28 @@ $MARIAN/build/marian \
     --train-sets data/corpus.$SRC data/corpus.$TGT \
     --vocabs model/vocab.$SRC$TGT.spm model/vocab.$SRC$TGT.spm \
     --dim-vocabs 32000 32000 \
-    --mini-batch-fit -w 5000 \
+    --mini-batch-fit -w 2000 \
     --layer-normalization --tied-embeddings-all \
     --dropout-rnn 0.2 --dropout-src 0.1 --dropout-trg 0.1 \
     --early-stopping 5 --max-length 100 \
     --valid-freq 10000 --save-freq 10000 --disp-freq 1000 \
     --cost-type ce-mean-words --valid-metrics ce-mean-words bleu-detok \
-    --valid-sets data/newsdev2016.$SRC data/newsdev2016.$TGT \
+    --valid-sets data/transfile.$SRC data/transfile.$TGT \
     --log model/train.log --valid-log model/valid.log --tempdir model \
     --overwrite --keep-best \
     --seed 1111 --exponential-smoothing \
     --normalize=0.6 --beam-size=6 --quiet-translation
 
 # Translate dev set
-cat data/newsdev2016.$SRC \
+cat data/transfile.$SRC \
     | $MARIAN/build/marian-decoder -c model/model.npz.best-bleu-detok.npz.decoder.yml -d $GPUS -b 6 -n0.6 \
-      --mini-batch 64 --maxi-batch 100 --maxi-batch-sort src > data/newsdev2016.$SRC.output
+      --mini-batch 32 --maxi-batch 100 --maxi-batch-sort src > data/transfile.$SRC.output
 
 # Translate test set
 cat data/newstest2016.$SRC \
     | $MARIAN/build/marian-decoder -c model/model.npz.best-bleu-detok.npz.decoder.yml -d $GPUS -b 6 -n0.6 \
-      --mini-batch 64 --maxi-batch 100 --maxi-batch-sort src > data/newstest2016.$SRC.output
+      --mini-batch 32 --maxi-batch 100 --maxi-batch-sort src > data/newstest2016.$SRC.output
 
 # Calculate BLEU scores
-sacreBLEU/sacrebleu.py -t wmt16/dev -l $SRC-$TGT < data/newsdev2016.$SRC.output
+sacreBLEU/sacrebleu.py -t wmt16/dev -l $SRC-$TGT < data/transfile.$SRC.output
 sacreBLEU/sacrebleu.py -t wmt16 -l $SRC-$TGT < data/newstest2016.$SRC.output
